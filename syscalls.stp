@@ -1,0 +1,11 @@
+##################usage#################
+# sudo stap -c ls syscalls.stp
+#
+
+probe syscall.* {
+    println(thread_indent(4), "->", probefunc())    
+}
+
+probe syscall.*.return {
+    println(thread_indent(-4), "<-", probefunc())    
+}

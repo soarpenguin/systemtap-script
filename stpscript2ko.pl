@@ -106,9 +106,11 @@ my $result = `$command $uname $myscript -m $mymodule -p4`;
 chomp($result);
 ## $result
 if($? == 0) {
+    print color("green");
     print "The $myscript successful converted to $result.\n";
+    print color("reset");
 } else {
-    print "The $myscript convertion is failed!\n";
+    &myprint("The $myscript convertion is failed!\n");
 }
 
 ##----------------------------------------------------

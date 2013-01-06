@@ -18,6 +18,7 @@ chomp($uname = `uname -r`);
 ## $uname
 my $myscript; # systemstp script to convert. 
 my $mymodule; # kernel module name.
+my $guru; # guru mode
 my $kerneldir; # kernel source code dir.
 my $program = &_my_program();
 
@@ -25,6 +26,11 @@ my $command = 'stap -r';
 
 my $usage = "
 Usage: $program [option] ...
+
+       -g  
+            Guru mode. Enable parsing of unsafe expert-level 
+            constructs like embedded C.(Not enable default, 
+            if script contains embedded C, must enable it.)
 
        -h, --help 
             Display this help and exit
@@ -36,12 +42,12 @@ Usage: $program [option] ...
             The script name want to converted to *.ko.
        
        -r /DIR
-              Build  for  kernel  in given build tree. Can also 
-              be set with the SYSTEMTAP_RELEASE environment variable.
+            Build for kernel in given build tree. Can also 
+            be set with the SYSTEMTAP_RELEASE environment variable.
 
        -r RELEASE (default)
-              Build for kernel in build tree /lib/modules/RELEASE/build. 
-              Can also  be  set  with the SYSTEMTAP_RELEASE environment variable.
+            Build for kernel in build tree /lib/modules/RELEASE/build. 
+            Can also be set with the SYSTEMTAP_RELEASE environment variable.
 
        -V   Display version information.
 ";
@@ -50,6 +56,8 @@ my $ret = GetOptions(
     'script|s=s' => \$myscript,
     'module|m=s' => \$mymodule,
     'help|h'     => \&usage,
+    'V'          => \&usage,
+    'g'          => \$guru,
     'r=s'        => \$kerneldir
 );
 
@@ -100,6 +108,10 @@ if(! $kerneldir) {
             $uname = $1;
         }
     }
+}
+
+if($guru) {
+    $command = 'stap -g -r ';
 }
 
 my $result = `$command $uname $myscript -m $mymodule -p4`;

@@ -86,7 +86,7 @@ unless($mymodule) {
 
 ## the command to finish convertion
 if(! $kerneldir) {
-    &myprint("\nUse current running kernel: \"$uname\"!\n");
+    print("\nUse current running kernel: \"$uname\"!\n");
     if($uname =~ /^\'([^']+)\'/) {
         $uname = $1;
     }
@@ -100,10 +100,10 @@ if(! $kerneldir) {
             $uname = $kerneldir;
         }
         ## $uname
-        &myprint("Use kernel build tree: \"$uname\"!\n");
+        print("Use kernel build tree: \"$uname\"!\n");
     } else {
         &myprint("The kernel build tree: \"$kerneldir\" not exists!\n");
-        &myprint("Use current running kernel: \"$uname\"!\n");
+        print("Use current running kernel: \"$uname\"!\n");
         if($uname =~ /^\'([^']+)\'/) {
             $uname = $1;
         }
@@ -114,12 +114,20 @@ if($guru) {
     $command = 'stap -g -r ';
 }
 
-my $result = `$command $uname $myscript -m $mymodule -p4`;
+my $result = `$command $uname $myscript -m $mymodule -p4 2>&1`;
 chomp($result);
 ## $result
+if($result =~ 'embedded code') {
+    &myprint("The script contains embedded C. Please enable guru mode use -g.");
+} elsif ($result =~ 'no probes') {
+    &myprint("Make sure have probes.");
+} elsif ($? != 0) {
+    &myprint("$result");
+}
+
 if($? == 0) {
     print color("green");
-    print "The $myscript successful converted to $result.\n";
+    print "The $myscript successful converted to $result\n";
     print color("reset");
 } else {
     &myprint("The $myscript convertion is failed!\n");

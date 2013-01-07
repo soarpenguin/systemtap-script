@@ -1,0 +1,14 @@
+######### stap -l 'vfs.*'
+
+vfs.__set_page_dirty_buffers
+vfs.add_to_page_cache
+vfs.block_sync_page
+vfs.buffer_migrate_page
+vfs.do_mpage_readpage
+vfs.do_sync_read
+vfs.do_sync_write
+vfs.read
+vfs.readv
+vfs.remove_from_page_cache
+vfs.write
+vfs.writev

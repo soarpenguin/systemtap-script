@@ -1,0 +1,23 @@
+#!/usr/bin/stap
+
+global groups
+
+probe begin {
+    printf("Collecting data... press Ctrl-C to stop.\n")
+}
+
+probe syscallgroup.io = syscall.open, syscall.close,
+                        syscall.read, syscall.write
+{ groupname = "io" }
+
+probe syscallgroup.process = syscall.fork, syscall.execve
+{ groupname = "process" }
+
+probe syscallgroup.*
+{ groups [execname() . "/" . groupname]++ }
+
+probe end {
+    foreach(eg+ in groups)
+        printf("%s: %d\n", eg, groups[eg])
+}
+

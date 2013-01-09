@@ -1,0 +1,38 @@
+#!/usr/bin/env stap
+# iointervals.stp
+# Track time intervals for a subset of kernel
+# functions. Based on func_time_stats.stp.
+
+global startcall, intervals
+
+# apply multiple probe points when the call enter:
+probe syscall.open, syscall.close , 
+      syscall.read, syscall.write 
+{ 
+    startcall[name, tid()] = gettimeofday_us()
+}
+
+# when the call return, calculate the intervals:
+probe syscall.open.return, syscall.close.return,
+        syscall.read.return, syscall.write.return
+{
+    t = gettimeofday_us() 
+    old_t = startcall[name, tid()]
+    if (old_t) intervals[name] <<< t - old_t
+    delete startcall[name, tid()]
+}
+
+probe begin {
+    printf("Collecting data... press Ctrl-C to stop.\n")
+}
+
+# when terminal the running, display the infomation.
+probe end {
+    foreach (name in intervals) {
+        printf("intervals for %s -- min:%dus avg:%dus max:%dus count:%d\n",
+                name, @min(intervals[name]), @avg(intervals[name]),
+                @max(intervals[name]), @count(intervals[name]))
+        print(@hist_log(intervals[name]))
+    }
+}
+

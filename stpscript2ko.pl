@@ -3,8 +3,9 @@
 # use for to convert script to kernel module.
 #   stap -r 2.6.35.14-106.fc14.i686 nettop.stp -m nettop -p4
 #       
-#       -p NUM Stop  after  pass  NUM.   The passes are numbered 1-5: parse, elaborate, translate,
-#              compile, run.  See the PROCESSING section for details.
+#       -p NUM Stop  after  pass  NUM.   
+#           The passes are numbered 1-5: parse, elaborate, translate,
+#           compile, run.  See the PROCESSING section for details.
 
 use strict;
 use warnings;
@@ -117,12 +118,20 @@ if($guru) {
 my $result = `$command $uname $myscript -m $mymodule -p4 2>&1`;
 chomp($result);
 ## $result
-if($result =~ 'embedded code') {
-    &myprint("The script contains embedded C. Please enable guru mode use -g.");
-} elsif ($result =~ 'no probes') {
-    &myprint("Make sure have probes.");
-} elsif ($? != 0) {
-    &myprint("$result");
+if($? != 0) {
+    if($result =~ 'embedded code' and !$guru) {
+        &myprint("The script contains embedded C. Make try in enable guru mode use -g.");
+        print("Trying enable guru mode.....\n");
+        # make try enable guru mode default.
+        $command = 'stap -g -r ';
+        $result = `$command $uname $myscript -m $mymodule -p4 2>&1`;
+    } 
+
+    if ($result =~ 'no probes') {
+        &myprint("Make sure have probes.");
+    } elsif ($? != 0) {
+        &myprint("$result");
+    }
 }
 
 if($? == 0) {

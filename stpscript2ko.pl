@@ -21,9 +21,10 @@ my $myscript; # systemstp script to convert.
 my $mymodule; # kernel module name.
 my $guru; # guru mode
 my $kerneldir; # kernel source code dir.
+my $bufsize; # bufsize (megebyte) for kernel-to-user data transfer. 
 my $program = &_my_program();
 
-my $command = 'stap -r';
+my $command = 'stap';
 
 my $usage = "
 Usage: $program [option] ...
@@ -40,6 +41,7 @@ Usage: $program [option] ...
             The output module name(default: scriptname.ko).
 
        -s scriptname, --script scriptname
+            A script must be specified.
             The script name want to converted to *.ko.
        
        -r /DIR
@@ -51,6 +53,10 @@ Usage: $program [option] ...
             Can also be set with the SYSTEMTAP_RELEASE environment variable.
 
        -V   Display version information.
+       
+       -sNUM  
+            Use NUM megabyte buffers for kernel-to-user data transfer.  
+            On a multiprocessor in bulk mode, this is a per-processor amount.
 ";
 
 my $ret = GetOptions(
@@ -59,7 +65,8 @@ my $ret = GetOptions(
     'help|h'     => \&usage,
     'V'          => \&usage,
     'g'          => \$guru,
-    'r=s'        => \$kerneldir
+    'r=s'        => \$kerneldir,
+    'size=i'     => \$bufsize
 );
 
 $| =1;
@@ -69,7 +76,7 @@ if(! $ret) {
 }
 
 unless($myscript) {
-    &mydie("Please input the script needed convert to kernel module.");
+    &mydie("A script must be specified.");
 }
 
 if(! -e $myscript) {
@@ -112,10 +119,16 @@ if(! $kerneldir) {
 }
 
 if($guru) {
-    $command = 'stap -g -r ';
+    $command = 'stap -g';
 }
 
-my $result = `$command $uname $myscript -m $mymodule -p4 2>&1`;
+if($bufsize) {
+    $bufsize = "-s$bufsize";
+} else {
+    $bufsize = '';
+}
+
+my $result = `$command $bufsize -r $uname $myscript -m $mymodule -p4 2>&1`;
 chomp($result);
 ## $result
 if($? != 0) {
@@ -123,8 +136,8 @@ if($? != 0) {
         &myprint("The script contains embedded C. Make try in enable guru mode use -g.");
         print("Trying enable guru mode.....\n");
         # make try enable guru mode default.
-        $command = 'stap -g -r ';
-        $result = `$command $uname $myscript -m $mymodule -p4 2>&1`;
+        $command = 'stap -g';
+        $result = `$command $bufsize -r $uname $myscript -m $mymodule -p4 2>&1`;
     } 
 
     if ($result =~ 'no probes') {

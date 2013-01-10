@@ -20,7 +20,7 @@ function print_activity()
 {
     printf("%5s %5s %-7s %7s %7s %7s %7s %-15s\n",
             "PID", "UID", "DEV", "XMIT_PK", "RECV_PK",
-            "XMIT_KB", "RECV_KB", "COMMAND")
+            "XMIT_B", "RECV_B", "COMMAND")
 
     foreach ([pid, dev, exec, uid] in ifrecv) {
         ifmerged[pid, dev, exec, uid] += @count(ifrecv[pid,dev,exec,uid]);
@@ -31,11 +31,30 @@ function print_activity()
     foreach ([pid, dev, exec, uid] in ifmerged-) {
         n_xmit = @count(ifxmit[pid, dev, exec, uid])
         n_recv = @count(ifrecv[pid, dev, exec, uid])
-        printf("%5d %5d %-7s %7d %7d %7d %7d %-15s\n",
-            pid, uid, dev, n_xmit, n_recv,
-            n_xmit ? @sum(ifxmit[pid, dev, exec, uid])/1024 : 0,
-            n_recv ? @sum(ifrecv[pid, dev, exec, uid])/1024 : 0,
-            exec)
+        if(n_xmit) {
+            t_xmit = @sum(ifxmit[pid, dev, exec, uid]);
+            if(t_xmit > 1024){
+                t_xmit = t_xmit / 1024;
+                str_txmit = sprint(t_xmit) . "K";
+            } else {
+                str_txmit = sprint(t_recv);
+            }
+        } else {
+            str_txmit = "0";
+        }
+        if(n_recv) {
+            t_recv = @sum(ifxmit[pid, dev, exec, uid]);
+            if(t_recv > 1024){
+                t_recv = t_recv / 1024;
+                str_trecv = sprint(t_recv) . "K";
+            } else {
+                str_trecv = sprint(t_recv);
+            }
+        } else {
+            str_trecv = "0";
+        }
+        printf("%5d %5d %-7s %7d %7d %7s %7s %-15s\n",
+            pid, uid, dev, n_xmit, n_recv, str_txmit, str_trecv, exec)
     }
 
     print("\n")

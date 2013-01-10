@@ -1,0 +1,14 @@
+netdev.change_mac
+netdev.change_mtu
+netdev.change_rx_flag
+netdev.close
+netdev.get_stats
+netdev.hard_transmit
+netdev.ioctl
+netdev.open
+netdev.receive
+netdev.register
+netdev.rx
+netdev.set_promiscuity
+netdev.transmit
+netdev.unregister

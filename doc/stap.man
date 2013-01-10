@@ -1,0 +1,18 @@
+man page for systemtap
+----------------------------------
+man stapfuncs
+man stapprobes
+man stapex
+man stapvars
+man stappaths
+man stap
+man staprun
+
+To list the probeable functions in the kernel, use the listings mode.
+        % stap -l 'kernel.function("*")'
+
+To list the probeable functions and local variables in the kernel,
+use  another  listings mode.
+        % stap -L 'kernel.function("*")'
+
+man stap-server

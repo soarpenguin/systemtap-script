@@ -89,6 +89,10 @@ unless($mymodule) {
     } else {
         $mymodule = "$myscript";
     }
+    
+    if($mymodule =~ /[^_0-9a-zA-Z]/) {
+        $mymodule =~ s/[^_0-9a-zA-Z]//g;
+    }
 }
 ## $mymodule
 

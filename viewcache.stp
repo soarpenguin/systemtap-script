@@ -1,0 +1,334 @@
+#!/usr/bin/stap
+#
+# This Script used to scan buffer/cache and statistic each file mapped page 
+#
+#
+
+%{
+#include <linux/sched.h>
+#include <linux/mmzone.h>
+#include <linux/nodemask.h>
+#include <linux/gfp.h>
+#include <linux/cpuset.h>
+#include <linux/delay.h>
+%}
+
+%{
+
+%}
+
+%{
+#define lru_to_page(_head) (list_entry((_head)->prev, struct page, lru))
+
+static inline void
+add_page_to_active_list(struct zone *zone, struct page *page)
+{
+        list_add(&page->lru, &zone->active_list);
+        zone->nr_active++;
+}
+
+static inline void
+add_page_to_inactive_list(struct zone *zone, struct page *page)
+{
+        list_add(&page->lru, &zone->inactive_list);
+        zone->nr_inactive++;
+}
+
+%}
+
+%{
+unsigned long NR_TO_SCAN = 128;  //we scan a 64 page cluster for a time
+%}
+
+%{
+#define prefetchw_prev_lru_page(_page, _base, _field)                   \
+        do {                                                            \
+                if ((_page)->lru.prev != _base) {                       \
+                        struct page *prev;                              \
+                                                                        \
+                        prev = lru_to_page(&(_page->lru));              \
+                        prefetchw(&prev->_field);                       \
+                }                                                       \
+        } while (0)
+%}
+
+
+%{
+static unsigned long isolate_lru_pages(unsigned long nr_to_scan,
+                struct list_head *src, struct list_head *dst,
+                unsigned long *scanned)
+{
+        unsigned long nr_taken = 0;
+        struct page *page;
+        unsigned long scan;
+
+        for (scan = 0; scan < nr_to_scan && !list_empty(src); scan++) {
+                struct list_head *target;
+                page = lru_to_page(src);
+                prefetchw_prev_lru_page(page, src, flags);
+
+                BUG_ON(!PageLRU(page));
+
+                list_del(&page->lru);
+                target = src;
+                if (likely(get_page_unless_zero(page))) {
+                        /*
+                         * Be careful not to clear PageLRU until after we're
+                         * sure the page is not being freed elsewhere -- the
+                         * page release code relies on it.
+                         */
+                        ClearPageLRU(page);
+                        target = dst;
+                        nr_taken++;
+                } /* else it is being freed elsewhere */
+
+                list_add(&page->lru, target);
+        }
+
+        *scanned = scan;
+        return nr_taken;
+}
+%}
+
+
+//use B-Tree to store inode data
+%{
+struct cache_node {
+        unsigned long ino;    // inode NO.
+        unsigned long nr;     // number of pages related to this inode current in memory
+        struct cache_node *left, *right;
+};
+
+typedef struct cache_node node;
+
+node * root;
+/*
+ Given a binary tree, return true if a node
+ with the target data is found in the tree. Recurs
+ down the tree, chooses the left or right
+ branch by comparing the target to each node.
+*/
+static int 
+cache_node_lookup(node *node, unsigned long target) {
+        // 1. Base case == empty tree
+        // in that case, the target is not found so return false
+        if (node == NULL) {
+                return 0;
+        }
+        else {
+                // 2. see if found here
+                if (target == node->ino) {
+                        node->nr++;
+                        return 1;
+                } else {
+                        // 3. otherwise recur down the correct subtree
+                        if (target < node->ino) return(cache_node_lookup(node->left, target));
+                        else return(cache_node_lookup(node->right, target));
+                }
+        }
+}
+
+static void
+insert_cache_node (node **tree,node *item) 
+{
+        if(!(*tree)) {
+                *tree = item;
+                return;
+        }
+        if(item->ino<(*tree)->ino)  
+                insert_cache_node(&(*tree)->left, item);
+        else if(item->ino>(*tree)->ino)
+                insert_cache_node(&(*tree)->right, item);
+}
+
+#ifdef SW
+static int 
+find_get_cache_node(node * node, unsigned long target)
+{
+        struct cache_node * n;
+        if(cache_node_lookup(node, target)) //cache find
+                return 1;
+        else { // cache miss
+                n = kmalloc(sizeof(struct cache_node), GFP_KERNEL);
+                if (!n) return -ENOMEM;
+                n->ino = target;
+                n->nr = 1;
+                n->left = NULL;
+                n->right = NULL;
+                insert_cache_node(&node, n);
+                return 0;
+        }
+}
+#endif
+
+static void 
+traverse_tree(node *node) {
+        if(node->left) traverse_tree(node->left);
+        printk(KERN_ALERT "inode: %lu, num: %lu\n", node->ino, node->nr);
+        if(node->right) traverse_tree(node->right);
+}
+
+static void 
+destroy_tree(node *node) {
+        if(node->left) traverse_tree(node->left);
+        if(node->right) traverse_tree(node->right);
+        kfree(node);
+}
+
+static int 
+scan_hold_list(struct list_head *src, struct list_head *dst, unsigned long *nr)
+{
+        struct page *page;
+        while(!list_empty(src)) {
+                page = lru_to_page(src);
+                list_del(&page->lru);
+                //we only do file mapped page , etl. skip the anonymous page
+                if(!PageSwapCache(page) && !((unsigned long)page->mapping & PAGE_MAPPING_ANON)) {
+                        //because we don't have the page and inode lock, so 
+                        //we must insure both mapping and inode object has not be freed
+                        if(likely(page->mapping && page->mapping->host)) {
+                                struct cache_node * curr;
+                                int ret;
+                                unsigned long ino = page->mapping->host->i_ino ;
+                                ret = cache_node_lookup(root, ino);
+                                if(ret != 1)  {// not found, so create a new node;
+                                        curr = kmalloc(sizeof(struct cache_node), GFP_KERNEL);
+                                        //FIX me, we should put remain page back to LRU
+                                        if (curr == NULL) return -ENOMEM;
+                                        curr->ino = ino;
+                                        curr->nr = 1;
+                                        curr->left = NULL;
+                                        curr->right = NULL;
+                                        insert_cache_node(&root, curr);
+                                }
+                        }
+                        *nr++;
+                }
+                //put back page to zone's active list
+                list_add(&page->lru, dst);
+        }
+        return 0;      
+}
+%}
+
+function viewcache:long()
+%{
+        pg_data_t *pgdat;
+
+        unsigned long i = 0, j = 0;
+        int zone_idx, node_idx;
+        int ret;
+        struct zone *zone;
+        struct page *page = NULL;
+        //        struct address_space *mapping;
+        unsigned long pgmoved = 0;
+        unsigned long scaned;
+        unsigned long nr_to_scan = 0;
+        //we use l_active and l_inactive to store the temp list stolened page from LRU
+        LIST_HEAD(l_active);
+        LIST_HEAD(l_inactive);
+        LIST_HEAD(l_hold);
+        unsigned long nr_active ,nr_inactive;
+        
+        //get the fist zone
+        zone = NODE_DATA(first_online_node)->node_zones;
+
+        cond_resched();
+
+        for (;;) {
+                if (!zone) break;
+
+                cond_resched();
+
+                nr_active = zone->nr_active;
+                nr_inactive = zone->nr_inactive;
+                node_idx = zone->zone_pgdat->node_id;
+                zone_idx = zone - zone->zone_pgdat->node_zones;
+
+                while(nr_active) {
+                        nr_to_scan = min(NR_TO_SCAN, nr_active);
+                        //lock the zone
+                        printk(KERN_ALERT "%d %d %ld %ld\n", node_idx, zone_idx, nr_active, nr_to_scan);
+                        spin_lock_irq(&zone->lru_lock);
+                        //we try to scan 'nr_to_scan' page, and save page scand in 'scaned' variable
+                        //and number of page be moved to tmp list is saved in pgmoved variable
+                        pgmoved = isolate_lru_pages(nr_to_scan, &zone->active_list,
+                                                    &l_active, &scaned);
+                        zone->pages_scanned += scaned;
+                        zone->nr_active -= pgmoved;
+                        spin_unlock_irq(&zone->lru_lock);
+                        //decrease the scaned page
+                        nr_active -= nr_to_scan;
+
+                        //here we have a 'l_active' list store the page stored from active list
+                        if(scan_hold_list(&l_active, &l_hold, &i) < 0 ) goto done;
+
+                        spin_lock_irq(&zone->lru_lock);
+                        while(!list_empty(&l_hold)) {
+                                page = lru_to_page(&l_hold);
+                                prefetchw_prev_lru_page(page, &l_hold, flags);
+                                list_del(&page->lru);
+                                BUG_ON(PageLRU(page));
+                                SetPageLRU(page);
+                                BUG_ON(!PageActive(page));
+                                add_page_to_active_list(zone, page);
+                        }
+                        spin_unlock_irq(&zone->lru_lock);
+                        //force to sleep 300 msec
+                        msleep(300);
+                } 
+                while(nr_inactive) {
+                        nr_to_scan = min(NR_TO_SCAN, nr_inactive);
+                        printk(KERN_ALERT "%d %d %ld %ld\n", node_idx, zone_idx, nr_inactive, nr_to_scan);
+                        spin_lock_irq(&zone->lru_lock);
+                        pgmoved = isolate_lru_pages(nr_to_scan, &zone->inactive_list,
+                                                    &l_inactive, &scaned);
+                        zone->pages_scanned += scaned;
+                        zone->nr_inactive -= pgmoved;
+                        spin_unlock_irq(&zone->lru_lock);
+                        nr_inactive -= nr_to_scan;
+
+                        if (scan_hold_list(&l_inactive, &l_hold, &j)<0) goto done;
+
+                        spin_lock_irq(&zone->lru_lock);
+                        while(!list_empty(&l_hold)) {
+                                page = lru_to_page(&l_hold);
+                                BUG_ON(PageLRU(page));
+                                SetPageLRU(page);
+                                list_del(&page->lru);
+                                if (PageActive(page))
+                                        add_page_to_active_list(zone, page);
+                                else
+                                        add_page_to_inactive_list(zone, page);
+                        }
+                        spin_unlock_irq(&zone->lru_lock);
+                        //sleep 300 msecs
+                        msleep(300);
+                }
+
+                if (zone < zone->zone_pgdat->node_zones + MAX_NR_ZONES - 1)
+                        zone++;
+                else {
+                        int nid = next_online_node(zone->zone_pgdat->node_id);
+                        if (nid == MAX_NUMNODES)
+                                pgdat = NULL;
+                        else
+                                pgdat = NODE_DATA(nid);
+                        if (pgdat)
+                                zone = pgdat->node_zones;
+                        else
+                                zone = NULL;
+                }
+        }
+done:   
+        //print result
+        traverse_tree(root);
+        //free memory 
+        destroy_tree(root);
+        THIS->__retvalue = i+j;
+%}
+
+probe begin {
+        printf("total file mapped LRU page = %d\n", viewcache())
+        exit()
+}

@@ -1,11 +1,8 @@
 #!/usr/bin/perl
 #
 # use for to convert scripts to kernel module.
-#   stap -r 2.6.35.14-106.fc14.i686 nettop.stp -m nettop -p4
+#   stap -r 2.6.35.14-106.fc14.i686 nettop.stp [scripts...]
 #       
-#       -p NUM Stop  after  pass  NUM.   
-#           The passes are numbered 1-5: parse, elaborate, translate,
-#           compile, run.  See the PROCESSING section for details.
 
 use strict;
 use warnings;

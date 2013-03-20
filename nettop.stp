@@ -18,6 +18,7 @@ probe netdev.receive
 
 function print_activity()
 {
+    ansi_clear_screen()
     printf("%5s %5s %-7s %7s %7s %7s %7s %-15s\n",
             "PID", "UID", "DEV", "XMIT_PK", "RECV_PK",
             "XMIT_B", "RECV_B", "COMMAND")

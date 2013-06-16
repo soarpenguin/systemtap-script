@@ -4,17 +4,18 @@ systemtap-script
 useful systemtap script.
 just for study.
 
-setup for ubuntu
+setup for ubuntu:
 
-  1.install systemtap
+    1.install systemtap
+
     $sudo apt-get install systemtap
     $sudo apt-get install systemtap-runtime
 
-  2.install kernel-debug-info
-  use source-list:
+    2.install kernel-debug-info
+
+    use source-list:
     (1)Install the Linux kernel debug image
     ----------------------------------------------------------
-
     Add debug source to the sources list of Ubuntu
 
     Create an /etc/apt/sources.list.d/ddebs.list by running the following line at
@@ -46,9 +47,10 @@ setup for ubuntu
 
     # apt-key adv --keyserver keyserver.ubuntu.com --recv-keys ECDCAD72428D7C01
     # apt-get update
-  download url:
+
+    download url:
     ubuntu kernel-debug-info: http://ddebs.ubuntu.com/pool/main/l/linux/
     
-setup for fedora
-    yum install systemtap kernel-devel debuginfo-install kernel
+setup for fedora:
 
+    yum install systemtap kernel-devel debuginfo-install kernel

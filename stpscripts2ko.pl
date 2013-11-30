@@ -6,13 +6,19 @@
 
 use strict;
 use warnings;
-use Smart::Comments;
 use Getopt::Long;
 use File::Basename;
 use Term::ANSIColor;
 
-my $uname;
-## $uname
+my $DEBUG = 0;
+if ($DEBUG) {
+    eval q{
+        use Smart::Comments;
+    };
+    die $@ if $@;
+}
+
+my $uname; ## $uname
 my $module; # kernel module name.
 my $guru; # guru mode
 my $kerneldir; # kernel source code dir.

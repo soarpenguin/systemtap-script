@@ -9,14 +9,20 @@
 
 use strict;
 use warnings;
-use Smart::Comments;
 use Getopt::Long;
 use File::Basename;
 use Term::ANSIColor;
 
+my $DEBUG = 0;
+if ($DEBUG) {
+    eval q{
+        use Smart::Comments;
+    };
+    die $@ if $@;
+}
+
 my $uname;
-chomp($uname = `uname -r`);
-## $uname
+chomp($uname = `uname -r`); ## $uname
 my $myscript; # systemstp script to convert. 
 my $mymodule; # kernel module name.
 my $guru; # guru mode

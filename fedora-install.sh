@@ -28,6 +28,7 @@ fi
 #------------------------------------------------------------------------------
 # Development
 yum -y install systemtap
+debuginfo-install kernel
 yum -y install systemtap-runtime
 yum -y install kernel-devel
 yum -y install systemtap-client

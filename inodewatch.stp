@@ -1,0 +1,31 @@
+#!/usr/bin/env stap
+ 
+#look up which process write or read from file(filename);
+
+# construct the scene:
+# rm -f test.dat && dd if=/dev/zero of=test.dat
+# look up inode of test.dat
+# stat -c '%i' test.dat
+ 
+# look the file of test.dat: major minor number
+# df
+# if lvm，look up device mapper like this:
+# ls -l /dev/disk/by-uuid/ff84db67-7d11-4732-ba0c-8681536dedd4 14670308
+# /dev/disk/by-uuid/ff84db67-7d11-4732-ba0c-8681536dedd4 -> ../../sda1
+# ls -l /dev/sdb1
+# brw-rw---- 1 root disk 8, 1 Feb 26 10:58 /dev/sda1
+#  just like above output: major:8 and minor:1
+ 
+# run this script
+# sudo stap inodewatch.stp  <major>  <minor>  <inode>
+# eg:
+# sudo stap inodewatch.stp 8 1 789137
+ 
+probe vfs.write, vfs.read
+{
+  # dev and ino are defined by vfs.write and vfs.read
+  if (dev == MKDEV($1,$2) # major/minor device
+      && ino == $3)
+    printf ("%s(%d) %s 0x%x/%u\n",
+      execname(), pid(), probefunc(), dev, ino)
+}

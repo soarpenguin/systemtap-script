@@ -54,3 +54,7 @@ setup for ubuntu:
 setup for fedora:
 
     yum install systemtap kernel-devel debuginfo-install kernel
+
+
+[![Bitdeli Badge](https://d2weczhvl823v0.cloudfront.net/soarpenguin/systemtap-script/trend.png)](https://bitdeli.com/free "Bitdeli Badge")
+

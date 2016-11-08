@@ -1,0 +1,17 @@
+#!/usr/bin/env stap
+#
+######################################## 
+
+probe process("/usr/sbin/nginx").function("ngx_process_events_and_timers"),
+  process("/usr/sbin/nginx").function("ngx_http_handler") {
+    if (pid() == target()) {
+      cycle = &@var("ngx_cycle\@ngx_cycle.c")
+
+      println("=====CONNECTIONS======")
+      println("Max connections: ", cycle->connection_n)
+      println("Free connections: ", cycle->free_connection_n)
+      println("Used connections: ", cycle->connection_n - cycle->free_connection_n)
+    }
+
+    exit()
+}

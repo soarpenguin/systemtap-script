@@ -1,0 +1,23 @@
+#!/bin/bash
+
+SYSTEMTAP_VERSION="2.6"
+
+sudo apt-get install \
+  zlib1g-dev \
+  elfutils \
+  libdw-dev
+
+(
+  cd /tmp
+
+  if [[ ! -d /tmp/systemtap-$SYSTEMTAP_VERSION ]]; then
+    wget https://sourceware.org/systemtap/ftp/releases/systemtap-$SYSTEMTAP_VERSION.tar.gz
+  fi
+
+  tar xzf systemtap-$SYSTEMTAP_VERSION.tar.gz
+  cd systemtap-$SYSTEMTAP_VERSION
+
+  ./configure
+  make -j4
+  sudo make install
+)
